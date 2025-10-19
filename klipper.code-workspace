@@ -1,0 +1,162 @@
+{
+	"folders": [
+		{
+			"path": "./klipper",
+            "name": "klipper"
+		},
+        {
+            "path": "./config",
+            "name": "klipper_config"
+        }
+	],
+	"settings": {
+        "files.associations": {
+            "xstring": "cpp"
+        },
+
+        // The number of spaces a tab is equal to. This setting is overridden
+        // based on the file contents when `editor.detectIndentation` is true.
+        "editor.tabSize": 4,
+
+        // Insert spaces when pressing Tab. This setting is overriden
+        // based on the file contents when `editor.detectIndentation` is true.
+        "editor.insertSpaces": true,
+
+        // When opening a file, `editor.tabSize` and `editor.insertSpaces`
+        // will be detected based on the file contents. Set to false to keep
+        // the values you've explicitly set, above.
+        "editor.detectIndentation": false,
+        "editor.rulers": [80, 120],
+        "editor.cursorBlinking": "smooth",
+
+        "files.trimFinalNewlines": true,
+        "files.trimTrailingWhitespace": true,
+        "files.autoSave": "afterDelay",
+        "files.autoSaveDelay": 3000,
+
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": [],
+
+        "editor.renderWhitespace": "all",
+        "files.watcherExclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/node_modules/**": true,
+            "**/tmp/**": true,
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/CVS": true,
+            "**/.DS_Store": true,
+            "**/node_modules": true,
+            "**/bower_components": true,
+            "**/dist/**": true,
+            "**/log/**": true,
+            "**/logs/**": true,
+            "**/.fdk/**": true,
+            "**/.vscode/**": true,
+            "**/.history/**": true
+        },
+        "files.exclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/node_modules/**": true,
+            "**/tmp/**": true,
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/CVS": true,
+            "**/.DS_Store": true,
+            "**/node_modules": true,
+            "**/bower_components": true,
+            "**/dist/**": true,
+            "**/log/**": true,
+            "**/.fdk/**": true,
+            "**/.history/**": true
+        },
+        "search.exclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/node_modules/**": true,
+            "**/tmp/**": true,
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/CVS": true,
+            "**/.DS_Store": true,
+            "**/node_modules": true,
+            "**/bower_components": true,
+            "**/dist/**": true,
+            "**/log/**": true,
+            "**/.history/**": true
+        },
+        "editor.renderControlCharacters": false,
+        "cortex-debug.variableUseNaturalFormat": false
+	},
+	"launch": {
+		"configurations": [
+            {
+                "name": "Debug Klipper MCU (J-Link)",
+                "type": "cppdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/out/klipper.elf",
+                "cwd": "${workspaceFolder}",
+                "MIMode": "gdb",
+                "miDebuggerPath": "/usr/bin/gdb-multiarch",
+                "miDebuggerServerAddress": "localhost:2331",
+                "preLaunchTask": "Start J-Link GDB Server"
+            },
+            {
+            "name": "Attach to Klipper Python (Docker)",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                    "host": "localhost",
+                    "port": 5678
+                },
+            }
+        ],
+		"compounds": []
+	},
+	"tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+            "label": "Build Firmware",
+            "type": "shell",
+            "command": "make",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+            },
+            {
+            "label": "Clean Build",
+            "type": "shell",
+            "command": "make clean && make",
+            "group": "build",
+            "problemMatcher": []
+            },
+            {
+            "label": "Restart Klipper Service",
+            "type": "shell",
+            "command": "docker",
+            "args": ["compose", "restart", "klipper"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "problemMatcher": []
+            },
+            {
+                "label": "Build and Restart",
+                "dependsOn": ["Build Firmware", "Restart Klipper Service"],
+                "dependsOrder": "sequence",
+                "problemMatcher": []
+            }
+		]
+	}
+}
+
+# Run klipper in Docker
+# /opt/klipper$ /opt/venv/bin/python klippy/klippy.py /config/printer.cfg
