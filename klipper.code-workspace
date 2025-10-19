@@ -96,25 +96,29 @@
 	"launch": {
 		"configurations": [
             {
-                "name": "Debug Klipper MCU (J-Link)",
-                "type": "cppdbg",
+                "name": "Run FW",
+                "cwd": "${workspaceFolder:klipper}",
+                "executable": "${workspaceFolder:klipper}/out/klipper.elf",
                 "request": "launch",
-                "program": "${workspaceFolder}/out/klipper.elf",
-                "cwd": "${workspaceFolder}",
-                "MIMode": "gdb",
-                "miDebuggerPath": "/usr/bin/gdb-multiarch",
-                "miDebuggerServerAddress": "localhost:2331",
-                "preLaunchTask": "Start J-Link GDB Server"
-            },
-            {
-            "name": "Attach to Klipper Python (Docker)",
-            "type": "debugpy",
-            "request": "attach",
-            "connect": {
-                    "host": "localhost",
-                    "port": 5678
+                "type": "cortex-debug",
+                "runToEntryPoint": "main",
+                "servertype": "jlink",
+                "serverpath": "JLinkGDBServerCLExe",
+                "device": "STM32F103C6",
+                "svdFile": "../STM32F103.svd",
+                "interface": "swd",
+                //"serialNumber": "${config:app_tx.serial}",
+                "armToolchainPath": "/usr/bin/",
+                "toolchainPrefix": "arm-none-eabi",
+                "showDevDebugOutput": "parsed",
+                "liveWatch": {
+                    "enabled": true,
+                    "samplesPerSecond": 4
                 },
-            }
+                "preLaunchTask": "Build Firmware",
+                "serverArgs": ["-speed", "4000"]
+            },
+
         ],
 		"compounds": []
 	},
@@ -122,31 +126,31 @@
         "version": "2.0.0",
         "tasks": [
             {
-            "label": "Build Firmware",
-            "type": "shell",
-            "command": "make",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": []
-            },
-            {
-            "label": "Clean Build",
-            "type": "shell",
-            "command": "make clean && make",
-            "group": "build",
-            "problemMatcher": []
+                "label": "Build Firmware",
+                "type": "shell",
+                "command": "make",
+                "group": {
+                    "kind": "build",
+                    "isDefault": true
+                },
+                "problemMatcher": []
             },
             {
-            "label": "Restart Klipper Service",
-            "type": "shell",
-            "command": "docker",
-            "args": ["compose", "restart", "klipper"],
-            "options": {
-                "cwd": "${workspaceFolder}/.."
+                "label": "Clean Build",
+                "type": "shell",
+                "command": "make clean && make",
+                "group": "build",
+                "problemMatcher": []
             },
-            "problemMatcher": []
+            {
+                "label": "Restart Klipper Service",
+                "type": "shell",
+                "command": "docker",
+                "args": ["compose", "restart", "klipper"],
+                "options": {
+                    "cwd": "${workspaceFolder}/.."
+                },
+                "problemMatcher": []
             },
             {
                 "label": "Build and Restart",
@@ -157,6 +161,3 @@
 		]
 	}
 }
-
-# Run klipper in Docker
-# /opt/klipper$ /opt/venv/bin/python klippy/klippy.py /config/printer.cfg

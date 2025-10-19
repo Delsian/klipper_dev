@@ -37,6 +37,7 @@ Host System
 ├── docker-compose.yml          # Container orchestration
 ├── Dockerfile                  # Custom Klipper container
 ├── klipper/                    # Klipper source code (git submodule)
+├── katapult/                   # Katapult bootloader source
 ├── config/                     # Configuration files
 │   ├── printer.cfg            # Klipper printer configuration
 │   ├── moonraker.conf         # Moonraker API configuration
@@ -52,6 +53,7 @@ Host System
 
 ```bash
 git clone https://github.com/Klipper3d/klipper.git klipper
+git clone https://github.com/Arksine/katapult.git katapult
 ```
 
 ### 2. Build and Start Containers
@@ -73,9 +75,65 @@ This will:
 
 ## Firmware Development Workflow
 
-### Building Firmware
+### Katapult Bootloader Setup
 
-The Klipper firmware is compiled on the host system, not in the container.
+Katapult is a bootloader that enables firmware updates over USB without requiring physical access to the SD card or boot pins. This is highly recommended for development workflows.
+
+#### Building Katapult Bootloader
+
+1. **Configure Katapult**:
+```bash
+cd katapult
+make menuconfig
+```
+
+Configure for STM32F103 (SKR Mini v1.3):
+- Microcontroller: STM32
+- Processor: STM32F103
+- Clock Reference: 8 MHz crystal
+- **Bootloader Size: 8KiB**
+- Communication: USB (PA11/PA12)
+- Status LED: Optional (e.g., PC13)
+
+2. **Build Bootloader**:
+```bash
+make clean
+make
+```
+
+Output: `out/katapult.bin`
+
+3. **Flash Bootloader** (one-time setup):
+```bash
+# Method 1: Copy to SD card as firmware.bin and power cycle
+cp out/katapult.bin /path/to/sdcard/firmware.bin
+
+# Method 2: Use J-Link
+# (Connect J-Link to SWD pins on board)
+JLinkExe -device STM32F103RC -if SWD -speed 4000
+J-Link> connect
+J-Link> loadfile out/katapult.bin 0x08000000
+J-Link> exit
+
+# Method 3: Use ST-Link
+st-flash write out/katapult.bin 0x08000000
+```
+
+4. **Verify Bootloader**:
+
+After flashing Katapult, the board will appear as a USB device with `idVendor=1d50, idProduct=6177`:
+
+```bash
+# Check dmesg for Katapult device
+dmesg | grep katapult
+# Output should show:
+# usb X-X: Product: stm32f103xe
+# usb X-X: Manufacturer: katapult
+```
+
+### Building Klipper Firmware
+
+When using Katapult bootloader, Klipper must be configured with the correct offset.
 
 1. **Configure Build**:
 ```bash
@@ -83,10 +141,10 @@ cd klipper
 make menuconfig
 ```
 
-Configure for your board (e.g., STM32F103 for SKR Mini v1.3):
+Configure for your board with Katapult:
 - Microcontroller: STM32
 - Processor: STM32F103
-- Bootloader offset: 28KiB
+- **Bootloader offset: 8KiB** (matches Katapult size)
 - Clock Reference: 8 MHz crystal
 - Communication: USB (PA11/PA12)
 
@@ -99,49 +157,42 @@ make
 Output: `out/klipper.bin`
 
 3. **Flash to Board**:
+
+With Katapult installed, you can flash Klipper over USB:
+
 ```bash
-# Copy to SD card as firmware.bin, or use:
-make flash FLASH_DEVICE=/dev/serial/by-id/usb-Klipper_stm32f103xe_...
+# Flash using Katapult's flashtool
+../katapult/scripts/flashtool.py -d /dev/ttyACM0 -f out/klipper.bin
+```
+
+The board will:
+1. Start in Katapult bootloader mode (idProduct=6177)
+2. Receive firmware update
+3. Reboot into Klipper (idProduct=614e)
+
+Verify Klipper is running:
+```bash
+dmesg | tail -20
+# Should show:
+# usb X-X: Product: stm32f103xe
+# usb X-X: Manufacturer: Klipper
+# usb X-X: SerialNumber: 35FFD8054E4B323817761243
 ```
 
 ### VSCode Integration
 
-Open the workspace file `klipper.code-workspace` for integrated development:
+Open the workspace file `klipper.code-workspace` for integrated development with preconfigured build and flash tasks.
 
-**Available Tasks** (Ctrl+Shift+B):
+**Available Tasks** (Ctrl+Shift+P → "Tasks: Run Task"):
+
+*Klipper Firmware:*
 - **Build Firmware**: Compile Klipper firmware
-- **Clean Build**: Clean and rebuild
-- **Restart Klipper Service**: Restart Docker container
-- **Build and Restart**: Sequential build and service restart
+- **Clean Build**: Clean and rebuild Klipper
+- **Restart Klipper Service**: Restart Klipper Docker container
+- **Build and Restart**: Build firmware and restart Klipper service
 
-**Debug Configurations**:
-- **Debug Klipper MCU (J-Link)**: Attach GDB to running MCU via J-Link
-- **Attach to Klipper Python (Docker)**: Debug Python service (requires debugpy setup)
-
-## Hardware Debugging with J-Link
-
-### Setup J-Link GDB Server
-
-1. **Start GDB Server** (in separate terminal):
-```bash
-JLinkGDBServer -device STM32F103RC -if SWD -speed 4000
-```
-
-2. **Launch Debug Session** in VSCode:
-- Select "Debug Klipper MCU (J-Link)" configuration
-- Set breakpoints in firmware code
-- Run debugger (F5)
-
-### GDB Commands
-
-```bash
-# Connect manually
-gdb-multiarch out/klipper.elf
-(gdb) target remote localhost:2331
-(gdb) monitor reset
-(gdb) load
-(gdb) continue
-```
+**Debug Configurations** (F5 or Run and Debug):
+- **Run FW (J-Link)**: Debug Klipper firmware on MCU via J-Link with live watch enabled
 
 ## Configuration
 
@@ -232,9 +283,13 @@ Adjust these based on your host system capabilities.
 ## Development Tips
 
 1. **Hot Reload**: Klipper Python code changes require service restart
-2. **Firmware Changes**: Require rebuild and reflash to MCU
+2. **Firmware Changes**: With Katapult, flash via USB using `flashtool.py`. Without Katapult, rebuild and reflash to MCU via SD card or programmer
 3. **Config Changes**: Restart Klipper service or use Mainsail UI restart
 4. **Keep Logs**: Logs persist in `./logs/` directory for debugging
+5. **USB Device States**:
+   - Katapult mode: idProduct=6177 (ready for firmware update)
+   - Klipper mode: idProduct=614e (normal operation)
+6. **Quick Firmware Update**: `cd klipper && make && ../katapult/scripts/flashtool.py -d /dev/ttyACM0 -f out/klipper.bin`
 
 ## Network Access
 
@@ -256,4 +311,3 @@ When modifying Klipper source:
 ## License
 
 This development environment configuration is provided as-is. Klipper itself is licensed under GPL v3.
-
