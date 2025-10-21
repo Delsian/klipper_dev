@@ -10,6 +10,11 @@ services:
       - 'c 166:* rmw'  # ttyACM devices
       - 'c 188:* rmw'  # ttyUSB devices
 
+    # Add CAN capabilities
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      
     volumes:
       # Mount Klipper source code
       - ./klipper:/opt/klipper:rw
@@ -17,10 +22,8 @@ services:
       # Mount configuration
       - ./config:/opt/printer_data/config:rw
 
-      # Mount serial devices directory
-      - /dev/serial:/dev/serial:rw
-      - /dev/ttyACM0:/dev/ttyACM0:rw
-      - /dev/ttyUSB0:/dev/ttyUSB0:rw
+      # Mount /dev with bind propagation to get dynamic devices
+      - /dev:/dev:rw
 
       # Shared socket directory for moonraker
       - klipper-socket:/tmp/klipper

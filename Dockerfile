@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     libusb-1.0-0 \
     usbutils \
+    can-utils \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/klipper
